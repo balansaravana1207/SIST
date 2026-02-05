@@ -3,13 +3,13 @@
 import { useUser } from "@/context/UserContext";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { motion } from "framer-motion";
+import { Plus, Calendar, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 
 export default function AnnouncementsPage() {
-    const { profile, user } = useUser();
+    const { profile } = useUser();
+    const [mounted, setMounted] = useState(false);
     const [announcements, setAnnouncements] = useState<any[]>([]);
-    const [newTitle, setNewTitle] = useState("");
-    const [newContent, setNewContent] = useState("");
-    const role = profile?.role || "student";
 
     const fetchAnnouncements = async () => {
         const { data, error } = await supabase
@@ -17,107 +17,126 @@ export default function AnnouncementsPage() {
             .select("*")
             .order("created_at", { ascending: false });
 
-        if (data) {
-            setAnnouncements(data);
-        } else if (error) {
-            console.error("Error fetching announcements:", error.message);
-        }
+        if (data) setAnnouncements(data);
     };
 
     useEffect(() => {
+        setMounted(true);
         fetchAnnouncements();
 
         const channel = supabase
-            .channel("announcements-all")
+            .channel("assignments-updates")
             .on(
                 "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: "announcements",
-                },
-                () => {
-                    fetchAnnouncements();
-                }
+                { event: "*", schema: "public", table: "announcements" },
+                () => fetchAnnouncements()
             )
             .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return () => { supabase.removeChannel(channel); };
     }, []);
 
-    const handlePost = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            const { error } = await supabase.from("announcements").insert([
-                {
-                    title: newTitle,
-                    content: newContent,
-                    created_by: user?.id,
-                    target_role: "all",
-                },
-            ]);
+    const role = profile?.role || "student";
+    const todayDateString = mounted ? new Date().toLocaleDateString() : "";
 
-            if (error) throw error;
-            setNewTitle("");
-            setNewContent("");
-        } catch (error) {
-            console.error("Error posting announcement:", error);
+    const demoGroups = [
+        {
+            date: "Today, " + todayDateString,
+            items: [
+                { id: 101, title: "Assignment: Impact of 1913 events", content: "Votes for Woman", status: "late" },
+            ]
+        },
+        {
+            date: "Upcoming Tasks",
+            items: [
+                { id: 102, title: "Group assignment: Calculus Project", content: "Submit by Friday", status: "pending" },
+                { id: 103, title: "Lab Record: Chemistry", content: "Experiments on chemical equilibrium and kinetics.", status: "pending" }
+            ]
         }
-    };
+    ];
+
+    const displayGroups = (announcements && announcements.length > 0)
+        ? [{ date: "Recent Updates", items: announcements }]
+        : demoGroups;
 
     return (
-        <div className="announcements-container">
-            {(role === "admin" || role === "faculty") && (
-                <div className="card mb-4">
-                    <h3>Post New Announcement</h3>
-                    <form onSubmit={handlePost} className="mt-2">
-                        <div className="form-group">
-                            <input
-                                className="form-input"
-                                placeholder="Title"
-                                value={newTitle}
-                                onChange={e => setNewTitle(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div className="form-group">
-                            <textarea
-                                className="form-input"
-                                placeholder="Contents..."
-                                rows={3}
-                                value={newContent}
-                                onChange={e => setNewContent(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <button className="btn btn-primary" type="submit">Broadcast Now</button>
-                    </form>
-                </div>
-            )}
+        <div className="assignments-page">
+            <header className="flex-between">
+                <h2 className="heading-lg">Your Assignments</h2>
+                {role !== "student" && (
+                    <button className="btn btn-primary btn-sm">
+                        <Plus size={18} /> New Task
+                    </button>
+                )}
+            </header>
 
-            <div className="card mt-4">
-                <h3>Official Announcements</h3>
-                <div className="announcement-feed mt-2">
-                    {announcements.map(a => (
-                        <div key={a.id} className="announcement-card">
-                            <div className="a-header">
-                                <strong>{a.title}</strong>
-                                <span className="a-date">{a.created_at?.toDate() ? a.created_at.toDate().toLocaleDateString() : "Just now"}</span>
-                            </div>
-                            <p className="mt-1">{a.content}</p>
+            <div className="assignments-container mt-4">
+                {displayGroups.map((group, gIdx) => (
+                    <div key={gIdx} className="date-group mt-4">
+                        <h4 className="date-label">{group.date}</h4>
+                        <div className="assignment-stack mt-2">
+                            {group.items.map((item, iIdx) => (
+                                <motion.div
+                                    key={item.id}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: (gIdx * 0.2) + (iIdx * 0.1) }}
+                                    className="assignment-card"
+                                >
+                                    <div className="card-top flex-between">
+                                        <div className="title-area">
+                                            <h3>{item.title}</h3>
+                                            <p>{item.content}</p>
+                                        </div>
+                                        <div className={`status-dot ${item.status === 'late' ? 'late' : ''}`}>
+                                            {item.status === 'late' ? <AlertCircle size={20} /> : <Clock size={20} />}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
                         </div>
-                    ))}
-                </div>
+                    </div>
+                ))}
             </div>
 
             <style jsx>{`
-        .announcements-container { display: flex; flex-direction: column; gap: 20px; }
-        .announcement-card { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; }
-        .a-header { display: flex; justify-content: space-between; }
-        .a-date { font-size: 0.75rem; color: var(--text-muted); }
-      `}</style>
+                .assignments-page { max-width: 800px; }
+                .date-label { 
+                    font-size: 0.85rem; 
+                    font-weight: 700; 
+                    color: var(--text-main); 
+                    margin-bottom: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .assignment-stack { display: flex; flex-direction: column; gap: 16px; }
+                .assignment-card {
+                    background: var(--surface);
+                    padding: 24px;
+                    border-radius: var(--radius-lg);
+                    border: 1px solid var(--border);
+                    box-shadow: var(--shadow-sm);
+                    transition: transform 0.2s ease;
+                    cursor: pointer;
+                }
+                .assignment-card:hover { border-color: var(--primary); transform: translateX(4px); }
+                .title-area h3 { font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+                .title-area p { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
+                
+                .status-dot {
+                    width: 44px; height: 44px;
+                    background: var(--surface-secondary);
+                    border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center;
+                    color: var(--primary);
+                }
+                .status-dot.late { color: var(--error); background: rgba(239, 68, 68, 0.05); }
+
+                @media (max-width: 600px) {
+                    .assignment-card { padding: 16px; }
+                }
+            `}</style>
         </div>
     );
 }

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { UserProvider } from "@/context/UserContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 
 export const metadata: Metadata = {
   title: "SIST | College Academic Companion",
@@ -19,7 +21,11 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body>
-        {children}
+        <UserProvider>
+          <NotificationProvider>
+            {children}
+          </NotificationProvider>
+        </UserProvider>
       </body>
     </html>
   );

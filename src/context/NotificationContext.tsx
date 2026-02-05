@@ -26,19 +26,45 @@ const NotificationContext = createContext<{
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
     const { user } = useUser();
     const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [hasLoggedError, setHasLoggedError] = useState(false);
 
     const fetchNotifications = async () => {
         if (!user) return;
-        const { data, error } = await supabase
-            .from("notifications")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false });
 
-        if (data) {
-            setNotifications(data as Notification[]);
-        } else if (error) {
-            console.error("Error fetching notifications:", error.message);
+        // Skip fetching if Supabase URL is not configured
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+            if (!hasLoggedError) {
+                console.warn("⚠️ Notifications disabled: NEXT_PUBLIC_SUPABASE_URL is not configured.");
+                setHasLoggedError(true);
+            }
+            return;
+        }
+
+        try {
+            const { data, error } = await supabase
+                .from("notifications")
+                .select("*")
+                .eq("user_id", user.id)
+                .order("created_at", { ascending: false });
+
+            if (error) {
+                // Only log once to avoid console spam
+                if (!hasLoggedError) {
+                    console.warn("⚠️ Could not fetch notifications:", error.message);
+                    setHasLoggedError(true);
+                }
+            } else if (data) {
+                setNotifications(data as Notification[]);
+                setHasLoggedError(false); // Reset on successful fetch
+            }
+        } catch (err: any) {
+            // Gracefully handle network errors (e.g., Supabase unreachable)
+            if (!hasLoggedError) {
+                console.warn("⚠️ Notifications unavailable: Unable to connect to the server.");
+                setHasLoggedError(true);
+            }
+            // Keep existing notifications or set empty array
+            setNotifications([]);
         }
     };
 
