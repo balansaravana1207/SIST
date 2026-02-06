@@ -75,13 +75,6 @@ export default function DashboardLayout({
             );
           })}
         </nav>
-
-        <div className="sidebar-footer">
-          <button className="nav-item sign-out" onClick={handleSignOut}>
-            <LogOut size={22} />
-            <span>Sign Out</span>
-          </button>
-        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -209,21 +202,6 @@ export default function DashboardLayout({
               height: 20px;
               background: var(--primary);
               border-radius: 4px;
-            }
-
-            .sidebar-footer {
-              padding: 24px 16px;
-              border-top: 1px solid var(--border);
-            }
-
-            .sign-out {
-              width: 100%;
-              color: var(--error);
-            }
-
-            .sign-out:hover {
-              background: rgba(239, 68, 68, 0.05);
-              color: var(--error);
             }
 
             .main-content {
